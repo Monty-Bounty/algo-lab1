@@ -1,6 +1,7 @@
 #include <iostream>
+#include <fstream>
 #include <string> // для getline()
-#include <windows.h> // Добавлено для работы с консолью Windows
+// #include <windows.h> // Добавлено для работы с консолью Windows
 
 using namespace std;
 
@@ -20,11 +21,164 @@ struct CS
     string efficiency_class;
 };
 
+void SaveToFile(const string& filename, const Pipe& pipe, const CS& cs, bool pipe_exists, bool cs_exists) 
+{
+    ofstream fout(filename); // переменная записи в файл
+    if (fout.is_open())
+    {
+        fout << pipe_exists << endl;
+        fout << cs_exists << endl;
+        
+        if (pipe_exists) 
+        {
+            fout << pipe.name << endl;
+            fout << pipe.length << endl;
+            fout << pipe.diameter << endl;
+            fout << pipe.in_repair << endl;
+        }
+        
+        if (cs_exists) 
+        {
+            fout << cs.name << endl;
+            fout << cs.workshops_total << endl;
+            fout << cs.workshops_in_operation << endl;
+            fout << cs.efficiency_class << endl;
+        }
+        
+        cout << "Данные успешно сохранены в файл " << filename << endl;
+        fout.close();
+    } 
+    else
+    {
+        cout << "Ошибка при открытии файла для записи!" << endl;
+    }
+}
+
+bool LoadFromFile(const string& filename, Pipe& pipe, CS& cs, bool& pipe_exists, bool& cs_exists) 
+{
+    ifstream fin(filename);
+    if (fin.is_open())
+    {
+        string line;
+        
+        // Читаем флаги существования
+        getline(fin, line);
+        pipe_exists = (line == "1");
+        getline(fin, line);
+        cs_exists = (line == "1");
+        
+        if (pipe_exists)
+        {
+            // Читаем данные трубы
+            getline(fin, pipe.name);
+            if (pipe.name.empty())
+            {
+                cout << "Ошибка: некорректное имя трубы в файле" << endl;
+                return false;
+            }
+            
+            getline(fin, line);
+            try
+            {
+                pipe.length = stod(line);
+                if (pipe.length <= 0)
+                {
+                    cout << "Ошибка: некорректная длина трубы в файле" << endl;
+                    return false;
+                }
+            } 
+            catch (...)
+            {
+                cout << "Ошибка при чтении длины трубы из файла" << endl;
+                return false;
+            }
+            
+            getline(fin, line);
+            try
+            {
+                pipe.diameter = stoi(line);
+                if (pipe.diameter <= 0)
+                {
+                    cout << "Ошибка: некорректный диаметр трубы в файле" << endl;
+                    return false;
+                }
+            }
+            catch (...)
+            {
+                cout << "Ошибка при чтении диаметра трубы из файла" << endl;
+                return false;
+            }
+            
+            getline(fin, line);
+            pipe.in_repair = (line == "1");
+        }
+        
+        if (cs_exists)
+        {
+            // Читаем данные КС
+            getline(fin, cs.name);
+            if (cs.name.empty()) 
+            {
+                cout << "Ошибка: некорректное имя КС в файле" << endl;
+                return false;
+            }
+            
+            getline(fin, line);
+            try
+            {
+                cs.workshops_total = stoi(line);
+                if (cs.workshops_total <= 0) 
+                {
+                    cout << "Ошибка: некорректное общее количество цехов в файле" << endl;
+                    return false;
+                }
+            } 
+            catch (...) 
+            {
+                cout << "Ошибка при чтении общего количества цехов из файла" << endl;
+                return false;
+            }
+            
+            getline(fin, line);
+            try 
+            {
+                cs.workshops_in_operation = stoi(line);
+                if (cs.workshops_in_operation < 0 || cs.workshops_in_operation > cs.workshops_total) 
+                {
+                    cout << "Ошибка: некорректное количество рабочих цехов в файле" << endl;
+                    return false;
+                }
+            } 
+            catch (...) 
+            {
+                cout << "Ошибка при чтении количества рабочих цехов из файла" << endl;
+                return false;
+            }
+            
+            getline(fin, cs.efficiency_class);
+            if (cs.efficiency_class.empty()) 
+            {
+                cout << "Ошибка: некорректный класс КС в файле" << endl;
+                return false;
+            }
+        }
+        
+        cout << "Данные успешно загружены из файла " << filename << endl;
+        fin.close();
+        return true;
+    }
+    else 
+    {
+        cout << "Ошибка при открытии файла для чтения!" << endl;
+        return false;
+    }
+}
+
 int main()
 {
     // Команды для корректного отображения кириллицы в консоли Windows (utf-8)
-    SetConsoleCP(65001);
-    SetConsoleOutputCP(65001);
+    //SetConsoleCP(65001);
+    //SetConsoleOutputCP(65001);
     
     Pipe the_pipe;
     CS the_cs;
@@ -38,9 +192,10 @@ int main()
         cout << "1. Добавить трубу\n";
         cout << "2. Добавить КС\n";
         cout << "3. Просмотр объектов\n";
-        cout << "4. Редактировать трубу\n";
-        cout << "5. Редактировать КС\n";
-        // пока не реализованы файлы нет соответствующих пунктов в меню
+        cout << "4. Редактировать трубу (изменить статус работы)\n";
+        cout << "5. Редактировать КС (включить/выключить КС)\n";
+        cout << "6. Сохранить данные в фaйл\n";
+        cout << "7. Загрузить данные из файла\n";
         cout << "0. Выход\n";
         cout << "Выберите действие: ";
 
@@ -107,8 +262,15 @@ int main()
                         {
                             try 
                             {
-                                the_pipe.length = stod(length_input); // преобразует строку (string) в число с плавающей точкой типа double
-                                break;
+                                if (stod(length_input) > 0)
+                                {
+                                    the_pipe.length = stod(length_input); // преобразует строку (string) в число с плавающей точкой типа double
+                                    break;
+                                }
+                                else
+                                {
+                                    valid = false;
+                                }
                             }
                             catch (...) // ловит всё ошибки
                             {
@@ -138,8 +300,15 @@ int main()
                          {
                             try 
                             {
-                                the_pipe.diameter = stoi(diameter_input); // преобразует строку (string) в целое число int
-                                break;
+                                if (stoi(diameter_input) > 0)
+                                {
+                                    the_pipe.diameter = stoi(diameter_input); // преобразует строку (string) в целое число int
+                                    break;
+                                }
+                                else
+                                {
+                                    valid = false;
+                                }
                             }
                             catch (...) 
                             {
@@ -316,55 +485,228 @@ int main()
                 } 
                 else 
                 {
-                    the_pipe.in_repair = !the_pipe.in_repair;
-                    cout << "Статус ремонта трубы изменен. Новый статус: " << (the_pipe.in_repair ? "В ремонте\n" : "В эксплуатации\n");
+                    cout << "\nТекущие параметры трубы:\n";
+                    cout << "Название: " << the_pipe.name << endl;
+                    cout << "Статус: " << (the_pipe.in_repair ? "В ремонте" : "В эксплуатации") << endl;
+
+                    cout << "\n1. Изменить название\n";
+                    cout << "2. Изменить статус ремонта\n";
+                    cout << "0. Отмена\n";
+                    cout << "Выберите действие: ";
+
+                    string choice_str;
+                    getline(cin, choice_str);
+                    
+                    // Проверка корректности ввода
+                    bool valid = true;
+                    for (char c : choice_str) 
+                    {
+                        if (!isdigit(c)) 
+                        {
+                            valid = false;
+                            break;
+                        }
+                    }
+                    
+                    if (!valid || choice_str.empty()) 
+                    {
+                        cout << "Ошибка: введите корректный номер пункта меню.\n";
+                        break;
+                    }
+
+                    int edit_choice = stoi(choice_str);
+
+                    switch (edit_choice) 
+                    {
+                        case 1: 
+                        {
+                            string new_name;
+                            cout << "Введите новое название трубы: ";
+                            while (true) 
+                            {
+                                getline(cin, new_name);
+                                if (!new_name.empty()) 
+                                {
+                                    the_pipe.name = new_name;
+                                    cout << "Название трубы успешно изменено.\n";
+                                    break;
+                                }
+                                cout << "Ошибка: Название не может быть пустым.\n";
+                                cout << "Введите новое название трубы: ";
+                            }
+                            break;
+                        }
+                        case 2: 
+                        {
+                            the_pipe.in_repair = !the_pipe.in_repair;
+                            cout << "Статус ремонта трубы изменен. Новый статус: " 
+                                << (the_pipe.in_repair ? "В ремонте" : "В эксплуатации") << endl;
+                            break;
+                        }
+                        case 0:
+                            cout << "Отмена редактирования.\n";
+                            break;
+                        default:
+                            cout << "Ошибка: неверный пункт меню.\n";
+                            break;
+                    }
                 }
                 break;
             }
+
             case 5: // Редактировать КС
             { 
                 if (!cs_exists) 
                 {
-                     cout << "Сначала нужно создать КС (пункт 2).\n";
+                    cout << "Сначала нужно создать КС (пункт 2).\n";
                 } 
                 else 
                 {
-                    cout << "Текущее состояние цехов: " << the_cs.workshops_in_operation << "/" << the_cs.workshops_total << "\n";
-                    cout << "1. Запустить один цех\n";
-                    cout << "2. Остановить один цех\n";
+                    cout << "\nТекущие параметры КС:\n";
+                    cout << "Название: " << the_cs.name << endl;
+                    cout << "Цеха: " << the_cs.workshops_in_operation << "/" << the_cs.workshops_total << endl;
+                    cout << "Класс: " << the_cs.efficiency_class << endl;
+                
+                    cout << "\n1. Изменить название\n";
+                    cout << "2. Изменить класс станции\n";
+                    cout << "3. Изменить количество работающих цехов\n";
+                    cout << "0. Отмена\n";
                     cout << "Выберите действие: ";
-                    int cs_choice;
-                    cin >> cs_choice;
+                
+                    string choice_str;
+                    getline(cin, choice_str);
 
-                    if (cs_choice == 1)
+                    // Проверка корректности ввода
+                    bool valid = true;
+                    for (char c : choice_str) 
                     {
-                        if (the_cs.workshops_in_operation < the_cs.workshops_total) 
+                        if (!isdigit(c)) 
                         {
-                            the_cs.workshops_in_operation++;
-                            cout << "Цех запущен. Цехов в работе: " << the_cs.workshops_in_operation << "\n";
-                        } 
-                        else 
-                        {
-                            cout << "Ошибка: Все цеха уже работают!\n";
+                            valid = false;
+                            break;
                         }
-                    } 
-                    else if (cs_choice == 2) 
+                    }
+
+                    if (!valid || choice_str.empty()) 
                     {
-                        if (the_cs.workshops_in_operation > 0) 
+                        cout << "Ошибка: введите корректный номер пункта меню.\n";
+                        break;
+                    }
+                
+                    int edit_choice = stoi(choice_str);
+                
+                    switch (edit_choice) 
+                    {
+                        case 1: 
                         {
-                            the_cs.workshops_in_operation--;
-                            cout << "Цех остановлен. Цехов в работе: " << the_cs.workshops_in_operation << "\n";
-                        } 
-                        else 
-                        {
-                            cout << "Ошибка: Нет работающих цехов!\n";
+                            string new_name;
+                            cout << "Введите новое название КС: ";
+                            while (true) 
+                            {
+                                getline(cin, new_name);
+                                if (!new_name.empty()) 
+                                {
+                                    the_cs.name = new_name;
+                                    cout << "Название КС успешно изменено.\n";
+                                    break;
+                                }
+                                cout << "Ошибка: Название не может быть пустым.\n";
+                                cout << "Введите новое название КС: ";
+                            }
+                            break;
                         }
-                    } 
-                    else 
-                    {
-                        cout << "Неверный выбор.\n";
+                        case 2: 
+                        {
+                            string new_class;
+                            cout << "Введите новый класс станции: ";
+                            while (true) 
+                            {
+                                getline(cin, new_class);
+                                if (!new_class.empty()) 
+                                {
+                                    the_cs.efficiency_class = new_class;
+                                    cout << "Класс станции успешно изменен.\n";
+                                    break;
+                                }
+                                cout << "Ошибка: Класс станции не может быть пустым.\n";
+                                cout << "Введите новый класс станции: ";
+                            }
+                            break;
+                        }
+                        case 3: 
+                        {
+                            cout << "Введите новое количество работающих цехов (доступно цехов: " 
+                                 << the_cs.workshops_total << "): ";
+
+                            string working_input;
+                            while (true) 
+                            {
+                                getline(cin, working_input);
+                                // Проверяем, что строка содержит только цифры
+                                bool valid = true;
+                                for (char c : working_input) 
+                                {
+                                    if (!isdigit(c)) 
+                                    {
+                                        valid = false;
+                                        break;
+                                    }
+                                }
+                                if (valid && !working_input.empty()) 
+                                {
+                                    try 
+                                    {
+                                        int new_working = stoi(working_input);
+                                        if (new_working < 0) 
+                                        {
+                                            cout << "Ошибка: количество не может быть отрицательным.\n";
+                                        } 
+                                        else if (new_working > the_cs.workshops_total) 
+                                        {
+                                            cout << "Ошибка: рабочих цехов не может быть больше общего количества (" 
+                                                 << the_cs.workshops_total << ").\n";
+                                        } 
+                                        else 
+                                        {
+                                            the_cs.workshops_in_operation = new_working;
+                                            cout << "Количество работающих цехов успешно изменено.\n";
+                                            break;
+                                        }
+                                    }
+                                    catch (...) 
+                                    {
+                                        valid = false;
+                                    }
+                                }
+                                cout << "Введите новое количество работающих цехов: ";
+                            }
+                            break;
+                        }
+                        case 0:
+                            cout << "Отмена редактирования.\n";
+                            break;
+                        default:
+                            cout << "Ошибка: неверный пункт меню.\n";
+                            break;
                     }
                 }
+                break;
+            }
+            case 6: // Сохранить 
+            {
+                string filename;
+                cout << "Введите имя файла для сохранения: ";
+                getline(cin, filename);
+                SaveToFile(filename, the_pipe, the_cs, pipe_exists, cs_exists);
+                break;
+            }              
+
+            case 7: // Загрузить 
+            {
+                string filename;
+                cout << "Введите имя файла для загрузки: ";
+                getline(cin, filename);
+                LoadFromFile(filename, the_pipe, the_cs, pipe_exists, cs_exists);
                 break;
             }
             case 0: // Выход
