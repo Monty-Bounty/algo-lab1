@@ -1,12 +1,19 @@
 #include <iostream>
 #include <fstream>
+#include <vector>
 #include <climits>  // для INT_MAX.
 //  INT_MAX определяет максимальное значение для типа int в системе и используется в функции getValidInt() как значение по умолчанию для параметра max.
 #include <string>
 // #include <windows.h> // Добавлено для работы с консолью Windows
 using namespace std;
 
+vector<Pipe> pipes;
+vector<CS> cs_list;
+int next_pipe_id = 0;
+int next_cs_id = 0;
+
 struct Pipe {
+    int id;
     string name;
     double length;
     int diameter;
@@ -14,6 +21,7 @@ struct Pipe {
 };
 
 struct CS {
+    int id;
     string name;
     int workshops_total;
     int workshops_in_operation;
@@ -80,138 +88,88 @@ int getValidInt(const string& prompt, int min = 0, int max = INT_MAX) {
     }
 }
 
+int generatePipeId() { 
+    return ++next_pipe_id; 
+}
+
+int generateCSId() { 
+    return ++next_cs_id; 
+}
+
 // Функции для работы с объектами
-void addPipe(Pipe& pipe, bool& pipe_exists) {
-    if (pipe_exists) {
-        cout << "Ошибка: Труба уже существует. Для изменения используйте пункт 4.\n";
-        return;
-    }
-    
-    pipe.name = getValidString("Введите название трубы: ");
-    pipe.length = getValidDouble("Введите длину (км): ");
-    pipe.diameter = getValidInt("Введите диаметр (мм): ");
-    pipe.in_repair = false;
-    pipe_exists = true;
-    cout << "Труба успешно добавлена!\n";
+
+void addPipe() {
+    Pipe new_pipe;
+    new_pipe.id = generatePipeId();
+    new_pipe.name = getValidString("Введите название трубы: ");
+    new_pipe.length = getValidDouble("Введите длину (км): ");
+    new_pipe.diameter = getValidInt("Введите диаметр (мм): ");
+    new_pipe.in_repair = false;
+    pipes.push_back(new_pipe);
+    cout << "Труба #" << new_pipe.id << " успешно добавлена!\n";
 }
 
-void addCS(CS& cs, bool& cs_exists) {
-    if (cs_exists) {
-        cout << "Ошибка: КС уже существует. Для изменения используйте пункт 5.\n";
-        return;
-    }
-    
-    cs.name = getValidString("Введите название КС: ");
-    cs.workshops_total = getValidInt("Введите общее количество цехов: ");
-    cs.workshops_in_operation = getValidInt("Введите количество цехов в работе: ", 0, cs.workshops_total);
-    cs.efficiency_class = getValidString("Введите класс станции: ");
-    cs_exists = true;
-    cout << "КС успешно добавлена!\n";
+void addCS() {
+    CS new_cs;
+    new_cs.id = generateCSId();
+    new_cs.name = getValidString("Введите название КС: ");
+    new_cs.workshops_total = getValidInt("Введите общее количество цехов: ");
+    new_cs.workshops_in_operation = getValidInt("Введите количество цехов в работе: ", 0, new_cs.workshops_total);
+    new_cs.efficiency_class = getValidString("Введите класс станции: ");
+    cs_list.push_back(new_cs);
+    cout << "КС #" << new_cs.id << " успешно добавлена!\n";
 }
 
-void displayObjects(const Pipe& pipe, const CS& cs, bool pipe_exists, bool cs_exists) {
-    cout << "\n--- Труба ---\n";
-    if (pipe_exists) {
-        cout << "Название: " << pipe.name
-             << "\nДлина: " << pipe.length << " км"
-             << "\nДиаметр: " << pipe.diameter << " мм"
-             << "\nСтатус: " << (pipe.in_repair ? "В ремонте" : "В эксплуатации") << "\n";
+void displayObjects() {
+    cout << "\n=== Трубы ===\n";
+    if (pipes.empty()) {
+        cout << "Трубы отсутствуют.\n";
     } else {
-        cout << "Труба еще не создана.\n";
+        for (const Pipe& pipe : pipes) {
+            cout << "\nТруба #" << pipe.id << "\n"
+                 << "Название: " << pipe.name << "\n"
+                 << "Длина: " << pipe.length << " км\n"
+                 << "Диаметр: " << pipe.diameter << " мм\n"
+                 << "Статус: " << (pipe.in_repair ? "В ремонте" : "В эксплуатации") << "\n";
+        }
     }
 
-    cout << "\n--- Компрессорная станция ---\n";
-    if (cs_exists) {
-        cout << "Название: " << cs.name
-             << "\nЦеха: " << cs.workshops_in_operation << "/" << cs.workshops_total
-             << "\nКласс: " << cs.efficiency_class << "\n";
+    cout << "\n=== Компрессорные станции ===\n";
+    if (cs_list.empty()) {
+        cout << "КС отсутствуют.\n";
     } else {
-        cout << "КС еще не создана.\n";
+        for (const CS& cs : cs_list) {
+            cout << "\nКС #" << cs.id << "\n"
+                 << "Название: " << cs.name << "\n"
+                 << "Цеха: " << cs.workshops_in_operation << "/" << cs.workshops_total << "\n"
+                 << "Класс: " << cs.efficiency_class << "\n";
+        }
     }
 }
 
-void editPipe(Pipe& pipe, bool pipe_exists) {
-    if (!pipe_exists) {
-        cout << "Сначала нужно создать трубу (пункт 1).\n";
-        return;
-    }
-
-    cout << "\nТекущие параметры трубы:\n"
-         << "Название: " << pipe.name << "\n"
-         << "Статус: " << (pipe.in_repair ? "В ремонте" : "В эксплуатации") << "\n"
-         << "\n1. Изменить название\n2. Изменить статус ремонта\n0. Отмена\n";
-
-    int choice = getValidInt("Выберите действие: ", 0, 2);
-    switch (choice) {
-        case 1:
-            pipe.name = getValidString("Введите новое название трубы: ");
-            cout << "Название трубы успешно изменено.\n";
-            break;
-        case 2:
-            pipe.in_repair = !pipe.in_repair;
-            cout << "Статус ремонта трубы изменен. Новый статус: " 
-                 << (pipe.in_repair ? "В ремонте" : "В эксплуатации") << "\n";
-            break;
-        case 0:
-            cout << "Отмена редактирования.\n";
-            break;
-    }
-}
-
-void editCS(CS& cs, bool cs_exists) {
-    if (!cs_exists) {
-        cout << "Сначала нужно создать КС (пункт 2).\n";
-        return;
-    }
-
-    cout << "\nТекущие параметры КС:\n"
-         << "Название: " << cs.name << "\n"
-         << "Цеха: " << cs.workshops_in_operation << "/" << cs.workshops_total << "\n"
-         << "Класс: " << cs.efficiency_class << "\n"
-         << "\n1. Изменить название\n2. Изменить класс станции\n"
-         << "3. Изменить количество работающих цехов\n0. Отмена\n";
-
-    int choice = getValidInt("Выберите действие: ", 0, 3);
-    switch (choice) {
-        case 1:
-            cs.name = getValidString("Введите новое название КС: ");
-            cout << "Название КС успешно изменено.\n";
-            break;
-        case 2:
-            cs.efficiency_class = getValidString("Введите новый класс станции: ");
-            cout << "Класс станции успешно изменен.\n";
-            break;
-        case 3:
-            cs.workshops_in_operation = getValidInt("Введите новое количество работающих цехов: ", 
-                                                  0, cs.workshops_total);
-            cout << "Количество работающих цехов успешно изменено.\n";
-            break;
-        case 0:
-            cout << "Отмена редактирования.\n";
-            break;
-    }
-}
-
-void SaveToFile(const string& filename, const Pipe& pipe, const CS& cs, bool pipe_exists, bool cs_exists) {
-    ofstream fout(filename); // переменная записи в файл
+void SaveToFile(const string& filename) {
+    ofstream fout(filename);
     if (fout.is_open()) {
-        fout << pipe_exists << endl;
-        fout << cs_exists << endl;
-        
-        if (pipe_exists) {
-            fout << pipe.name << endl;
-            fout << pipe.length << endl;
-            fout << pipe.diameter << endl;
-            fout << pipe.in_repair << endl;
+        // Сохраняем трубы
+        fout << pipes.size() << endl;
+        for (const Pipe& pipe : pipes) {
+            fout << pipe.id << endl
+                 << pipe.name << endl
+                 << pipe.length << endl
+                 << pipe.diameter << endl
+                 << pipe.in_repair << endl;
         }
-        
-        if (cs_exists) {
-            fout << cs.name << endl;
-            fout << cs.workshops_total << endl;
-            fout << cs.workshops_in_operation << endl;
-            fout << cs.efficiency_class << endl;
+
+        // Сохраняем КС
+        fout << cs_list.size() << endl;
+        for (const CS& cs : cs_list) {
+            fout << cs.id << endl
+                 << cs.name << endl
+                 << cs.workshops_total << endl
+                 << cs.workshops_in_operation << endl
+                 << cs.efficiency_class << endl;
         }
-        
+
         cout << "Данные успешно сохранены в файл " << filename << endl;
         fout.close();
     } else {
@@ -219,6 +177,8 @@ void SaveToFile(const string& filename, const Pipe& pipe, const CS& cs, bool pip
     }
 }
 
+
+// todo: обновить загрузку
 bool LoadFromFile(const string& filename, Pipe& pipe, CS& cs, bool& pipe_exists, bool& cs_exists) {
     ifstream fin(filename);
     if (fin.is_open()) {
@@ -318,16 +278,11 @@ bool LoadFromFile(const string& filename, Pipe& pipe, CS& cs, bool& pipe_exists,
 }
 
 int main() {
-    Pipe the_pipe;
-    CS the_cs;
-    bool pipe_exists = false;
-    bool cs_exists = false;
-    
     while (true) {
         cout << "\n========= МЕНЮ =========\n"
              << "1. Добавить трубу\n"
              << "2. Добавить КС\n"
-             << "3. Просмотр объектов\n"
+             << "3. Просмотр всех объектов\n"
              << "4. Редактировать трубу\n"
              << "5. Редактировать КС\n"
              << "6. Сохранить данные в файл\n"
@@ -337,18 +292,16 @@ int main() {
         int choice = getValidInt("Выберите действие: ", 0, 7);
         
         switch (choice) {
-            case 1: addPipe(the_pipe, pipe_exists); break;
-            case 2: addCS(the_cs, cs_exists); break;
-            case 3: displayObjects(the_pipe, the_cs, pipe_exists, cs_exists); break;
-            case 4: editPipe(the_pipe, pipe_exists); break;
-            case 5: editCS(the_cs, cs_exists); break;
+            case 1: addPipe(); break;
+            case 2: addCS(); break;
+            case 3: displayObjects(); break;
+            case 4: /* TODO: Обновить функцию редактирования */ break;
+            case 5: /* TODO: Обновить функцию редактирования */ break;
             case 6:
-                SaveToFile(getValidString("Введите имя файла для сохранения: "), 
-                          the_pipe, the_cs, pipe_exists, cs_exists);
+                SaveToFile(getValidString("Введите имя файла для сохранения: "));
                 break;
             case 7:
-                LoadFromFile(getValidString("Введите имя файла для загрузки: "), 
-                           the_pipe, the_cs, pipe_exists, cs_exists);
+                /* TODO: Обновить функцию загрузки */
                 break;
             case 0:
                 cout << "Выход из программы.\n";
