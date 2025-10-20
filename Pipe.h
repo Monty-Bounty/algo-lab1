@@ -33,7 +33,7 @@ public:
     // Этот оператор теперь используется ТОЛЬКО для вывода в консоль
     friend std::ostream& operator<<(std::ostream& os, const Pipe& p);
 
-    static Pipe createPipe(int new_id);
+    static Pipe createPipe(int new_id, const std::string& name, double length, int diameter);
 };
 
 #endif // PIPE_H

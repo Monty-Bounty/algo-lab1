@@ -18,25 +18,9 @@ bool Pipe::isInRepair() const { return in_repair; }
 
 void Pipe::setRepairStatus(bool status) { in_repair = status; }
 
-Pipe Pipe::createPipe(int new_id) {
-    Pipe p;
-    p.id = new_id;
-    p.name = getValidInput<std::string>("Введите название трубы: ");
-    
-    while (true) {
-        p.length = getValidInput<double>("Введите длину (км): ");
-        if (p.length > 0) break;
-        std::cout << "Ошибка: Длина должна быть положительным числом.\n";
-    }
-    
-    while (true) {
-        p.diameter = getValidInput<int>("Введите диаметр (мм): ");
-        if (p.diameter > 0) break;
-        std::cout << "Ошибка: Диаметр должен быть положительным целым числом.\n";
-    }
-
-    p.in_repair = false;
-    return p;
+// Теперь это просто фабрика, которая вызывает конструктор
+Pipe Pipe::createPipe(int new_id, const std::string& name, double length, int diameter) {
+    return Pipe(new_id, name, length, diameter, false); // Новая труба всегда в эксплуатации
 }
 
 // оператор для вывода в консоль

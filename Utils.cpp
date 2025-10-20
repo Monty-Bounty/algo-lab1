@@ -12,14 +12,10 @@ Logger::Logger(const std::string& filename) {
     }
 }
 
-void Logger::log(const std::string& message) {
+void Logger::log(const std::string& input) {
     if (logfile.is_open()) {
-        // Получаем текущее время
-        auto now = std::chrono::system_clock::now();
-        auto time_t_now = std::chrono::system_clock::to_time_t(now);
-        // Записываем время и сообщение
-        logfile << std::put_time(std::localtime(&time_t_now), "%d-%m-%Y %H:%M:%S")
-                << " - " << message << std::endl;
+        // Просто пишем в файл то, что получили
+        logfile << input << std::endl;
     }
 }
 

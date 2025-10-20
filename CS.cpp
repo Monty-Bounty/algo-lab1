@@ -20,23 +20,14 @@ double CS::getUnusedPercent() const {
     return (double)(workshops_total - workshops_in_operation) / workshops_total * 100.0;
 }
 
-CS CS::createCS(int new_id) {
-    CS cs;
-    cs.id = new_id;
-    cs.name = getValidInput<std::string>("Введите название КС: ");
-    
-    while (true) {
-        cs.workshops_total = getValidInput<int>("Введите общее количество цехов: ");
-        if (cs.workshops_total > 0) break;
-        std::cout << "Ошибка: общее число цехов должно быть больше нуля.\n";
-    }
-    
-    while (true) {
-        cs.workshops_in_operation = getValidInput<int>("Введите количество цехов в работе: ");
-        if (cs.workshops_in_operation >= 0 && cs.workshops_in_operation <= cs.workshops_total) break;
-        std::cout << "Ошибка: число работающих цехов не может быть отрицательным или больше общего числа.\n";
-    }
-    return cs;
+// Просто меняю значение, вся логика проверки будет в Manager
+void CS::setWorkshopsInOperation(int count) {
+    workshops_in_operation = count;
+}
+
+// Теперь это просто фабрика, которая вызывает конструктор
+CS CS::createCS(int new_id, const std::string& name, int workshops_total, int workshops_in_operation) {
+    return CS(new_id, name, workshops_total, workshops_in_operation);
 }
 
 // оператор для вывода в консоль

@@ -24,9 +24,11 @@ public:
     int getWorkshopsInOperation() const;// геттер
     double getUnusedPercent() const;
 
+    void setWorkshopsInOperation(int count); // Сеттер для редактирования
+
     friend std::ostream& operator<<(std::ostream& os, const CS& cs);
     
-    static CS createCS(int new_id);
+    static CS createCS(int new_id, const std::string& name, int workshops_total, int workshops_in_operation);
 };
 
 #endif // CS_H
