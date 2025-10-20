@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <string>
+#include <map>
 
 class CS {
 private:
@@ -12,6 +13,7 @@ private:
     std::string name;
     int workshops_total;
     int workshops_in_operation;
+    std::map<int, int> outgoing_connections; // key: destination CS id, value: pipe id
 
 public:
     CS();
@@ -23,8 +25,10 @@ public:
     int getWorkshopsTotal() const;      // геттер
     int getWorkshopsInOperation() const;// геттер
     double getUnusedPercent() const;
+    const std::map<int, int>& getOutgoingConnections() const; // Геттер для соединений
 
     void setWorkshopsInOperation(int count); // Сеттер для редактирования
+    void addConnection(int dest_cs_id, int pipe_id); // Метод для добавления соединения
 
     friend std::ostream& operator<<(std::ostream& os, const CS& cs);
     

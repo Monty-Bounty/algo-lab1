@@ -15,6 +15,10 @@ const std::string& CS::getName() const { return name; }
 int CS::getWorkshopsTotal() const { return workshops_total; }          // Реализация геттера
 int CS::getWorkshopsInOperation() const { return workshops_in_operation; } // Реализация геттера
 
+const std::map<int, int>& CS::getOutgoingConnections() const {
+    return outgoing_connections;
+}
+
 double CS::getUnusedPercent() const {
     if (workshops_total == 0) return 0.0;
     return (double)(workshops_total - workshops_in_operation) / workshops_total * 100.0;
@@ -23,6 +27,10 @@ double CS::getUnusedPercent() const {
 // Просто меняю значение, вся логика проверки будет в Manager
 void CS::setWorkshopsInOperation(int count) {
     workshops_in_operation = count;
+}
+
+void CS::addConnection(int dest_cs_id, int pipe_id) {
+    outgoing_connections[dest_cs_id] = pipe_id;
 }
 
 // Теперь это просто фабрика, которая вызывает конструктор
@@ -36,5 +44,11 @@ std::ostream& operator<<(std::ostream& os, const CS& cs) {
        << "Название: " << cs.name << "\n"
        << "Цеха (в работе/всего): " << cs.workshops_in_operation << "/" << cs.workshops_total << "\n"
        << "Процент незадействованных цехов: " << cs.getUnusedPercent() << "%\n";
+    if (!cs.outgoing_connections.empty()) {
+        os << "Соединения:\n";
+        for (const auto& pair : cs.outgoing_connections) {
+            os << "  -> КС ID: " << pair.first << " (через трубу ID: " << pair.second << ")\n";
+        }
+    }
     return os;
 }

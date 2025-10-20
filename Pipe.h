@@ -13,11 +13,12 @@ private:
     double length;
     int diameter;
     bool in_repair;
+    bool is_used;
 
 public:
     Pipe();
     // НОВЫЙ КОНСТРУКТОР: для удобной загрузки данных из файла
-    Pipe(int id, const std::string& name, double length, int diameter, bool in_repair);
+    Pipe(int id, const std::string& name, double length, int diameter, bool in_repair, bool is_used);
 
 
     // Геттеры (методы для получения значений полей)
@@ -27,8 +28,10 @@ public:
     double getLength() const;
     int getDiameter() const;
     bool isInRepair() const;
+    bool isUsed() const;
 
     void setRepairStatus(bool status);
+    void setUsed(bool used);
     
     // Этот оператор теперь используется ТОЛЬКО для вывода в консоль
     friend std::ostream& operator<<(std::ostream& os, const Pipe& p);

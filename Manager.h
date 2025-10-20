@@ -29,6 +29,9 @@ public:
     void saveData();
     void loadData();
 
+    void connect_stations();
+    void topological_sort();
+
 private:
     // Вспомогательные методы для поиска, возвращают ID объектов
     std::vector<int> findPipeIdsByName(const std::string& name);

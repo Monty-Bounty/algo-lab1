@@ -43,4 +43,6 @@ T getValidInput(const std::string& prompt) {
 template<>
 std::string getValidInput<std::string>(const std::string& prompt);
 
+bool isValidDiameter(int diameter);
+
 #endif // UTILS_H

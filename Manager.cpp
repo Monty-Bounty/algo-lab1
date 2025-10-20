@@ -5,6 +5,9 @@
 #include <fstream>
 #include <algorithm> // для max и sort
 #include <sstream>
+#include <vector>
+#include <queue>
+#include <map>
 
 // Теперь меню - это приватный метод класса
 void Manager::printMenu() {
@@ -15,6 +18,8 @@ void Manager::printMenu() {
               << "4. Работа с объектами (поиск, редактирование, удаление)\n"
               << "5. Сохранить данные\n"
               << "6. Загрузить данные\n"
+              << "7. Соединить КС\n"
+              << "8. Топологическая сортировка\n"
               << "0. Выход\n";
 }
 
@@ -39,6 +44,8 @@ void Manager::run() {
             case 4: workWithPackages(); break;
             case 5: saveData(); break;
             case 6: loadData(); break;
+            case 7: connect_stations(); break;
+            case 8: topological_sort(); break;
             case 0:
                 std::cout << "Выход из программы.\n";
                 return;
@@ -71,8 +78,8 @@ void Manager::addPipe() {
     while (true) {
         diameter = getValidInput<int>("Введите диаметр (мм): ");
         log(std::to_string(diameter));
-        if (diameter > 0) break;
-        std::cout << "Ошибка: Диаметр должен быть положительным целым числом.\n";
+        if (isValidDiameter(diameter)) break;
+        std::cout << "Ошибка: Диаметр должен быть одним из следующих: 500, 700, 1000, 1400.\n";
     }
 
     pipes.emplace(next_pipe_id, Pipe::createPipe(next_pipe_id, name, length, diameter));
@@ -129,6 +136,114 @@ void Manager::viewAllObjects() {
         for (const auto& pair : stations) {
             std::cout << pair.second << std::endl;
         }
+    }
+}
+
+void Manager::connect_stations() {
+    std::cout << "\n--- Соединение компрессорных станций ---\n";
+    
+    int src_id = getValidInput<int>("Введите ID исходной КС: ");
+    log(std::to_string(src_id));
+    if (stations.find(src_id) == stations.end()) {
+        std::cout << "Ошибка: КС с ID " << src_id << " не найдена.\n";
+        return;
+    }
+
+    int dest_id = getValidInput<int>("Введите ID конечной КС: ");
+    log(std::to_string(dest_id));
+    if (stations.find(dest_id) == stations.end()) {
+        std::cout << "Ошибка: КС с ID " << dest_id << " не найдена.\n";
+        return;
+    }
+
+    if (src_id == dest_id) {
+        std::cout << "Ошибка: Нельзя соединить КС саму с собой.\n";
+        return;
+    }
+
+    if (stations.at(src_id).getOutgoingConnections().count(dest_id)) {
+        std::cout << "Ошибка: Эти КС уже соединены.\n";
+        return;
+    }
+
+    std::cout << "Доступные диаметры: 500, 700, 1000, 1400 мм.\n";
+    int diameter;
+     while (true) {
+        diameter = getValidInput<int>("Введите желаемый диаметр трубы: ");
+        log(std::to_string(diameter));
+        if (isValidDiameter(diameter)) break;
+        std::cout << "Ошибка: Диаметр должен быть одним из следующих: 500, 700, 1000, 1400.\n";
+    }
+
+    int pipe_id_to_use = -1;
+    for (auto& pair : pipes) {
+        if (!pair.second.isUsed() && pair.second.getDiameter() == diameter) {
+            pipe_id_to_use = pair.first;
+            break;
+        }
+    }
+
+    if (pipe_id_to_use != -1) {
+        stations.at(src_id).addConnection(dest_id, pipe_id_to_use);
+        pipes.at(pipe_id_to_use).setUsed(true);
+        std::cout << "Станции успешно соединены трубой с ID " << pipe_id_to_use << ".\n";
+    } else {
+        std::cout << "Свободной трубы с диаметром " << diameter << " мм не найдено.\n";
+        std::cout << "Хотите создать новую трубу? (1 - да, 0 - нет): ";
+        int choice = getValidInput<int>("");
+        log(std::to_string(choice));
+        if (choice == 1) {
+            addPipe();
+        }
+    }
+}
+
+void Manager::topological_sort() {
+    std::cout << "\n--- Топологическая сортировка графа КС ---\n";
+
+    std::map<int, int> in_degree;
+    for (const auto& pair : stations) {
+        in_degree[pair.first] = 0;
+    }
+
+    for (const auto& pair : stations) {
+        for (const auto& conn : pair.second.getOutgoingConnections()) {
+            in_degree[conn.first]++;
+        }
+    }
+
+    std::queue<int> q;
+    for (const auto& pair : in_degree) {
+        if (pair.second == 0) {
+            q.push(pair.first);
+        }
+    }
+
+    std::vector<int> result;
+    while (!q.empty()) {
+        int u = q.front();
+        q.pop();
+        result.push_back(u);
+
+        if (stations.count(u)) {
+            for (const auto& conn : stations.at(u).getOutgoingConnections()) {
+                int v = conn.first;
+                in_degree[v]--;
+                if (in_degree[v] == 0) {
+                    q.push(v);
+                }
+            }
+        }
+    }
+
+    if (result.size() < stations.size()) {
+        std::cout << "Ошибка: В графе обнаружен цикл! Топологическая сортировка невозможна.\n";
+    } else {
+        std::cout << "Результат топологической сортировки:\n";
+        for (size_t i = 0; i < result.size(); ++i) {
+            std::cout << stations.at(result[i]).getName() << (i == result.size() - 1 ? "" : " -> ");
+        }
+        std::cout << std::endl;
     }
 }
 

@@ -32,3 +32,7 @@ std::string getValidInput<std::string>(const std::string& prompt) {
         std::cout << "Ошибка: Ввод не может быть пустым.\n";
     }
 }
+
+bool isValidDiameter(int diameter) {
+    return diameter == 500 || diameter == 700 || diameter == 1000 || diameter == 1400;
+}
