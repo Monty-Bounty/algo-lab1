@@ -7,11 +7,12 @@
 #include "CS.h"
 #include "Utils.h"
 #include <vector>
+#include <map>
 
 class Manager {
 private:
-    std::vector<Pipe> pipes;
-    std::vector<CS> stations;
+    std::map<int, Pipe> pipes;
+    std::map<int, CS> stations;
     int next_pipe_id;
     int next_cs_id;
     Logger logger; // Объект логгера
@@ -29,22 +30,21 @@ public:
     void loadData();
 
 private:
-    // Вспомогательные методы для поиска
-    std::vector<int> findPipeIndicesByName(const std::string& name);
-    std::vector<int> findPipeIndicesByRepairStatus(bool status);
-    std::vector<int> findCSIndicesByName(const std::string& name);
-    std::vector<int> findCSIndicesByUnusedPercent(double percent);
+    // Вспомогательные методы для поиска, возвращают ID объектов
+    std::vector<int> findPipeIdsByName(const std::string& name);
+    std::vector<int> findPipeIdsByRepairStatus(bool status);
+    std::vector<int> findCSIdsByName(const std::string& name);
+    std::vector<int> findCSIdsByUnusedPercent(double percent);
 
     // Новые методы для пакетной обработки
-    void processPipesPackage(const std::vector<int>& indices);
-    void processCsPackage(const std::vector<int>& indices);
+    void processPipesPackage(const std::vector<int>& ids);
+    void processCsPackage(const std::vector<int>& ids);
     
-    // Метод для редактирования КС, как и просили
-    void editCS(int index);
+    // Метод для редактирования КС
+    void editCS(int id);
 
-    // Шаблонный метод для выбора конкретных объектов из найденных
-    template<typename T>
-    std::vector<int> getObjectIndices(const std::vector<T>& objects, const std::vector<int>& found_indices);
+    // Новый приватный метод для выбора ID из списка
+    std::vector<int> getIdsFromUser(const std::vector<int>& available_ids);
 };
 
 #endif // MANAGER_H
