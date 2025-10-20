@@ -33,6 +33,7 @@ public:
     void topological_sort();
 
 private:
+    void printMenu();
     // Вспомогательные методы для поиска, возвращают ID объектов
     std::vector<int> findPipeIdsByName(const std::string& name);
     std::vector<int> findPipeIdsByRepairStatus(bool status);
