@@ -1,5 +1,5 @@
 bin/
 *.exe
 .vscode/
+tasks/
 log.txt
-GEMINI.md
