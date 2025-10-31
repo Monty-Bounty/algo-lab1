@@ -29,6 +29,7 @@ public:
 
     void setWorkshopsInOperation(int count); // Сеттер для редактирования
     void addConnection(int dest_cs_id, int pipe_id); // Метод для добавления соединения
+    void removeConnection(int dest_cs_id);
 
     friend std::ostream& operator<<(std::ostream& os, const CS& cs);
     
