@@ -33,7 +33,11 @@ void CS::addConnection(int dest_cs_id, int pipe_id) {
     outgoing_connections[dest_cs_id] = pipe_id;
 }
 
-// Теперь это просто фабрика, которая вызывает конструктор
+void CS::removeConnection(int dest_cs_id) {
+    outgoing_connections.erase(dest_cs_id);
+}
+
+// Теперь это просто cs, которая вызывает конструктор
 CS CS::createCS(int new_id, const std::string& name, int workshops_total, int workshops_in_operation) {
     return CS(new_id, name, workshops_total, workshops_in_operation);
 }

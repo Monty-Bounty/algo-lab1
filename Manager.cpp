@@ -333,6 +333,23 @@ void Manager::processPipesPackage(const std::vector<int>& ids) {
         if (to_delete_ids.empty()) return;
 
         for (int id : to_delete_ids) {
+            // Перед удалением трубы разрываем соединение, которое она образует
+            for (auto& station_pair : stations) {
+                CS& station = station_pair.second; 
+                int dest_cs_id_to_remove = -1;
+                for (const auto& conn : station.getOutgoingConnections()) {
+                    if (conn.second == id) { // conn.second - это pipe_id
+                        dest_cs_id_to_remove = conn.first;
+                        break;
+                    }
+                }
+                if (dest_cs_id_to_remove != -1) {
+                    station.removeConnection(dest_cs_id_to_remove);
+                    std::cout << "Разорвано соединение, использующее трубу ID " << id 
+                              << " (от КС ID " << station.getId() << " к КС ID " << dest_cs_id_to_remove << ").\n";
+                    break; // Труба может использоваться только в одном соединении
+                }
+            }
             pipes.erase(id);
         }
         std::cout << "Выбранные трубы успешно удалены.\n";
@@ -368,9 +385,65 @@ void Manager::processCsPackage(const std::vector<int>& ids) {
         if (to_delete_ids.empty()) return;
 
         for (int id : to_delete_ids) {
-            stations.erase(id);
+            bool is_connected = false;
+            try {
+                // Проверка на исходящие соединения
+                if (!stations.at(id).getOutgoingConnections().empty()) {
+                    is_connected = true;
+                }
+                // Проверка на входящие соединения
+                if (!is_connected) {
+                    for (const auto& station_pair : stations) {
+                        if (station_pair.first == id) continue;
+                        if (station_pair.second.getOutgoingConnections().count(id)) {
+                            is_connected = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (is_connected) {
+                    std::cout << "КС ID " << id << " является частью сети. Удаление приведет к разрыву соединений.\n";
+                    std::cout << "Вы уверены, что хотите продолжить? (1 - да, 0 - нет): ";
+                    int confirm = getValidInput<int>("");
+                    log(std::to_string(confirm));
+                    if (confirm != 1) {
+                        std::cout << "Удаление КС ID " << id << " отменено.\n";
+                        continue; // Переход к следующему ID
+                    }
+                }
+
+                // 1. Освобождаем трубы, которые шли ИЗ удаляемой КС
+                const auto& outgoing_conns = stations.at(id).getOutgoingConnections();
+                for (const auto& conn : outgoing_conns) {
+                    if (pipes.count(conn.second)) {
+                        pipes.at(conn.second).setUsed(false);
+                        std::cout << "Труба ID " << conn.second << " освобождена.\n";
+                    }
+                }
+
+                // 2. Удаляем входящие соединения В удаляемую КС из других станций
+                for (auto& station_pair : stations) {
+                    if (station_pair.first == id) continue;
+                    CS& other_station = station_pair.second;
+                    if (other_station.getOutgoingConnections().count(id)) {
+                        int pipe_id_to_free = other_station.getOutgoingConnections().at(id);
+                        other_station.removeConnection(id);
+                        if (pipes.count(pipe_id_to_free)) {
+                            pipes.at(pipe_id_to_free).setUsed(false);
+                            std::cout << "Разорвано входящее соединение с КС ID " << station_pair.first
+                                      << " (труба ID " << pipe_id_to_free << " освобождена).\n";
+                        }
+                    }
+                }
+
+                stations.erase(id);
+                std::cout << "КС ID " << id << " успешно удалена.\n";
+
+            } catch (const std::out_of_range& oor) {
+                 std::cout << "Ошибка: КС с ID " << id << " не найдена для удаления (возможно, уже удалена в этой сессии).\n";
+            }
         }
-        std::cout << "Выбранные КС успешно удалены.\n";
     }
 }
 
