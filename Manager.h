@@ -31,9 +31,13 @@ public:
 
     void connect_stations();
     void topological_sort();
+    void calculateMaxFlow();
+    void findShortestPath();
 
 private:
+    double calculateCapacity(const Pipe& p);
     void printMenu();
+    bool bfs_for_max_flow(const std::map<int, std::map<int, double>>& residual_graph, int s, int t, std::map<int, int>& parent);
     // Вспомогательные методы для поиска, возвращают ID объектов
     std::vector<int> findPipeIdsByName(const std::string& name);
     std::vector<int> findPipeIdsByRepairStatus(bool status);
