@@ -695,14 +695,20 @@ void Manager::calculateMaxFlow() {
         return;
     }
 
-    // Создание остаточной сети (residual graph)
+    //1. Создание остаточной сети (residual graph)    
+    // Создаем структуру для хранения остаточной сети. Это граф, 
+    // представленный как `map`, где ключ - ID исходной вершины, а 
+    // значение - еще один `map`, где ключ - ID конечной вершины, а 
+    // значение - текущая пропускная способность ребра.
     std::map<int, std::map<int, double>> residual_graph;
+    // Перебираем все станции, чтобы пройти по всем ребрам графа.  
     for (const auto& station_pair : stations) {
         int u = station_pair.first;
         for (const auto& connection : station_pair.second.getOutgoingConnections()) {
             int v = connection.first;
             int pipe_id = connection.second;
             if (pipes.count(pipe_id)) {
+                // Для каждой трубы вычисляем ее начальную пропускную способность.
                 double capacity = calculateCapacity(pipes.at(pipe_id));
                 residual_graph[u][v] = capacity;
                 // Инициализируем обратное ребро с 0 пропускной способностью
@@ -712,63 +718,83 @@ void Manager::calculateMaxFlow() {
             }
         }
     }
-
+    // 2. Основной цикл алгоритма
+    // map для хранения пути, найденного BFS. 
+    // parent[X] будет содержать вершину, из которой мы пришли в X.
     std::map<int, int> parent;
     double max_flow = 0;
 
     // Пока существует увеличивающий путь от истока к стоку
+    // пока наш поисковик (BFS) находит хотя бы один путь от
+    //  истока к стоку, по которому еще можно "протолкнуть" поток.
     while (bfs_for_max_flow(residual_graph, source, sink, parent)) {
+        // 3. Находим "узкое место"
+        // Инициализируем поток для ТЕКУЩЕГО найденного
+        //  пути максимальным возможным значением.
         double path_flow = std::numeric_limits<double>::max();
         // Находим минимальную остаточную пропускную способность на пути
+        // Идем по найденному пути в обратном порядке - 
+        // от стока (sink) к истоку (source), используя parent map.
         for (int v = sink; v != source; v = parent[v]) {
             int u = parent[v];
+            // На каждом шаге сравниваем path_flow с пропускной способностью
+            //  текущего ребра. В итоге path_flow станет равен 
+            //  минимальной пропускной способности на всем пути.
             path_flow = std::min(path_flow, residual_graph[u][v]);
         }
 
-        // Обновляем остаточные пропускные способности ребер
+        // 4. Обновляем остаточную сеть
         for (int v = sink; v != source; v = parent[v]) {
             int u = parent[v];
-            residual_graph[u][v] -= path_flow;
-            residual_graph[v][u] += path_flow;
+            residual_graph[u][v] -= path_flow; // Уменьшаем пропускную способность прямого ребра
+            residual_graph[v][u] += path_flow; // Увеличиваем пропускную способность обратного ребра
         }
 
-        // Добавляем поток этого пути к общему максимальному потоку
-        max_flow += path_flow;
+        max_flow += path_flow; // Добавляем поток этого пути к общему
     }
 
     std::cout << "Максимальный поток от КС " << source << " к КС " << sink << " составляет: " << max_flow << " условных единиц.\n";
 }
 
 bool Manager::bfs_for_max_flow(const std::map<int, std::map<int, double>>& residual_graph, int s, int t, std::map<int, int>& parent) {
-    std::map<int, bool> visited;
+    std::map<int, bool> visited; // Создаем "список посещенных комнат", чтобы не ходить по кругу.
     for(const auto& pair : stations) {
         visited[pair.first] = false;
     }
 
-    std::queue<int> q;
-    q.push(s);
-    visited[s] = true;
+    std::queue<int> q; // Создаем очередь "комнат к посещению".
+    q.push(s); // Кладем в нее первую комнату — наш старт `s`.
+    visited[s] = true; // Сразу отмечаем старт как посещенный.
+    // Очищаем карту путей от предыдущих итераций и указываем,
+    //  что у старта нет "родителя" (это условный знак).
     parent.clear();
     parent[s] = -1;
 
     while (!q.empty()) {
         int u = q.front();
         q.pop();
+        // Пока очередь комнат к посещению не пуста, берем первую из очереди (`u`) и убираем ее оттуда.
 
+        // Проверяем два правила:
+        // 1.  Мы еще не были в комнате v.
+        // 2.  Труба, ведущая в v, не заполнена.
         if (residual_graph.count(u)) {
-             for (const auto& pair : residual_graph.at(u)) {
+             for (const auto& pair : residual_graph.at(u)) { // Ищем всех соседей v для текущей комнаты u.
                 int v = pair.first;
                 double capacity = pair.second;
                 if (!visited[v] && capacity > 0) {
-                    q.push(v);
-                    parent[v] = u;
-                    visited[v] = true;
+                    q.push(v); // Добавляем соседа v в очередь на посещение.
+                    parent[v] = u; // Записываем в блокнот: "в v мы пришли из u".
+                    visited[v] = true; // отмечаем v как посещённую
                 }
             }
         }
     }
 
     // Если мы смогли посетить сток, значит, путь найден
+    // После того как цикл закончен (все достижимые комнаты посещены),
+    //  мы просто проверяем: "А смогли ли мы в итоге посетить сток t?".
+    //  Если да, visited[t] будет true, и функция вернет true. Иначе - false.
     return (visited[t] == true);
 }
 
@@ -798,53 +824,69 @@ void Manager::findShortestPath() {
         std::cout << "Ошибка: Начальная и конечная КС не могут совпадать.\n";
         return;
     }
-
-    std::map<int, double> dist;
-    std::map<int, int> prev;
+    // 1. Инициализация
+    std::map<int, double> dist; // "блокнот" для расстояний. Ключ - ID станции, значение - кратчайшее известное расстояние от start_node.
+    std::map<int, int> prev; // "Блокнот" для запоминания пути. prev[X] будет хранить ID станции, из которой мы пришли в X по кратчайшему пути.
     for (const auto& pair : stations) {
-        dist[pair.first] = std::numeric_limits<double>::max();
+        dist[pair.first] = std::numeric_limits<double>::max(); // ставим расстояние "бесконечность".
     }
-    dist[start_node] = 0;
+    dist[start_node] = 0; // Расстояние от старта до самого себя равно 0.
 
-    using pii = std::pair<double, int>;
+    // 2. Очередь с приоритетом
+    using pii = std::pair<double, int>; //псевдоним pii для пары {расстояние, ID станции} для удобства.
+    // Создаем очередь с приоритетом. std::greater<pii> делает ее МИНИМАЛЬНОЙ очередью, 
+    // то есть pq.top() всегда будет возвращать пару с наименьшим расстоянием.
     std::priority_queue<pii, std::vector<pii>, std::greater<pii>> pq;
-    pq.push({0.0, start_node});
+    pq.push({0.0, start_node}); // Кладем в очередь первую станцию - стартовую, с расстоянием 0.
 
-    while (!pq.empty()) {
+    // 3. Основной цикл алгоритма
+    while (!pq.empty()) { // пока есть станции для рассмотрения.
+        // Извлекаем из очереди станцию u с наименьшим известным расстоянием d.
         double d = pq.top().first;
         int u = pq.top().second;
         pq.pop();
 
+        // Важная оптимизация. В очереди могут лежать "устаревшие"
+        //  записи для одной и той же станции. Если мы уже нашли
+        //  путь короче (dist[u]), чем тот, что мы только что извлекли 
+        // (d), то эту запись просто пропускаем.
         if (d > dist[u]) {
             continue;
         }
         if (u == end_node) break; // Оптимизация: останавливаемся, как только добрались до цели
 
-        if (stations.count(u)) {
+        // 4. Обход соседей
+        if (stations.count(u)) { // Для текущей станции u перебираем все ее исходящие соединения.
             for (const auto& conn : stations.at(u).getOutgoingConnections()) {
                 int v = conn.first;
                 int pipe_id = conn.second;
 
                 if (pipes.count(pipe_id)) {
                     const Pipe& p = pipes.at(pipe_id);
+                    // Определяем "цену" пути по этой трубе. Если она в ремонте, цена - бесконечность, иначе - ее длина.
                     double weight = p.isInRepair() ? std::numeric_limits<double>::max() : p.getLength();
 
+                    // логика Дейкстры -> Проверяем, если текущий путь до u плюс путь от u до соседа v короче, чем ранее известный путь до v.
                     if (dist[u] != std::numeric_limits<double>::max() && dist[u] + weight < dist[v]) {
-                        dist[v] = dist[u] + weight;
-                        prev[v] = u;
-                        pq.push({dist[v], v});
+                        dist[v] = dist[u] + weight; // Если да - обновляем кратчайшее расстояние до v.
+                        prev[v] = u; // Запоминаем, что в v мы пришли из u.
+                        pq.push({dist[v], v}); // Добавляем (или обновляем) соседа v в очереди с новым, более коротким расстоянием.
                     }
                 }
             }
         }
     }
 
+    // 5. Восстановление и вывод пути
     if (dist[end_node] == std::numeric_limits<double>::max()) {
         std::cout << "Путь от КС " << start_node << " до КС " << end_node << " не найден.\n";
     } else {
         std::cout << "Кратчайший путь от КС " << start_node << " до КС " << end_node << " имеет длину: " << dist[end_node] << " км.\n";
         std::cout << "Путь: ";
         std::vector<int> path;
+        // разматываем клубок пути назад. Начиная с конечной точки end_node,
+        //  мы идем к prev[end_node], затем к prev[prev[end_node]] 
+        // и так далее, пока не дойдем до старта.
         for (int at = end_node; at != 0; at = prev.count(at) ? prev[at] : 0) {
             path.push_back(at);
              if (at == start_node) break;
