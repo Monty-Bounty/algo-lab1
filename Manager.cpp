@@ -8,6 +8,9 @@
 #include <vector>
 #include <queue>
 #include <map>
+#include <cmath>
+#include <limits>
+
 
 // Теперь меню - это приватный метод класса
 void Manager::printMenu() {
