@@ -8,6 +8,9 @@
 #include <vector>
 #include <queue>
 #include <map>
+#include <cmath>
+#include <limits>
+
 
 // Теперь меню - это приватный метод класса
 void Manager::printMenu() {
@@ -20,6 +23,8 @@ void Manager::printMenu() {
               << "6. Загрузить данные\n"
               << "7. Соединить КС\n"
               << "8. Топологическая сортировка\n"
+              << "9. Расчет максимального потока\n"
+              << "10. Поиск кратчайшего пути\n"
               << "0. Выход\n";
 }
 
@@ -46,6 +51,8 @@ void Manager::run() {
             case 6: loadData(); break;
             case 7: connect_stations(); break;
             case 8: topological_sort(); break;
+            case 9: calculateMaxFlow(); break;
+            case 10: findShortestPath(); break;
             case 0:
                 std::cout << "Выход из программы.\n";
                 return;
@@ -660,4 +667,250 @@ std::vector<int> Manager::findCSIdsByUnusedPercent(double percent) {
         }
     }
     return ids;
+}
+
+void Manager::calculateMaxFlow() {
+    std::cout << "\n--- Расчет максимального потока ---\n";
+    if (stations.size() < 2) {
+        std::cout << "Для расчета потока необходимо как минимум 2 компрессорные станции.\n";
+        return;
+    }
+
+    int source = getValidInput<int>("Введите ID исходной КС (исток): ");
+    log(std::to_string(source));
+    if (stations.find(source) == stations.end()) {
+        std::cout << "Ошибка: КС с ID " << source << " не найдена.\n";
+        return;
+    }
+
+    int sink = getValidInput<int>("Введите ID конечной КС (сток): ");
+    log(std::to_string(sink));
+    if (stations.find(sink) == stations.end()) {
+        std::cout << "Ошибка: КС с ID " << sink << " не найдена.\n";
+        return;
+    }
+
+    if (source == sink) {
+        std::cout << "Ошибка: Исток и сток не могут совпадать.\n";
+        return;
+    }
+
+    //1. Создание остаточной сети (residual graph)    
+    // Создаем структуру для хранения остаточной сети. Это граф, 
+    // представленный как `map`, где ключ - ID исходной вершины, а 
+    // значение - еще один `map`, где ключ - ID конечной вершины, а 
+    // значение - текущая пропускная способность ребра.
+    std::map<int, std::map<int, double>> residual_graph;
+    // Перебираем все станции, чтобы пройти по всем ребрам графа.  
+    for (const auto& station_pair : stations) {
+        int u = station_pair.first;
+        for (const auto& connection : station_pair.second.getOutgoingConnections()) {
+            int v = connection.first;
+            int pipe_id = connection.second;
+            if (pipes.count(pipe_id)) {
+                // Для каждой трубы вычисляем ее начальную пропускную способность.
+                double capacity = calculateCapacity(pipes.at(pipe_id));
+                residual_graph[u][v] = capacity;
+                // Инициализируем обратное ребро с 0 пропускной способностью
+                if (residual_graph.find(v) == residual_graph.end() || residual_graph[v].find(u) == residual_graph[v].end()) {
+                    residual_graph[v][u] = 0;
+                }
+            }
+        }
+    }
+    // 2. Основной цикл алгоритма
+    // map для хранения пути, найденного BFS. 
+    // parent[X] будет содержать вершину, из которой мы пришли в X.
+    std::map<int, int> parent;
+    double max_flow = 0;
+
+    // Пока существует увеличивающий путь от истока к стоку
+    // пока наш поисковик (BFS) находит хотя бы один путь от
+    //  истока к стоку, по которому еще можно "протолкнуть" поток.
+    while (bfs_for_max_flow(residual_graph, source, sink, parent)) {
+        // 3. Находим "узкое место"
+        // Инициализируем поток для ТЕКУЩЕГО найденного
+        //  пути максимальным возможным значением.
+        double path_flow = std::numeric_limits<double>::max();
+        // Находим минимальную остаточную пропускную способность на пути
+        // Идем по найденному пути в обратном порядке - 
+        // от стока (sink) к истоку (source), используя parent map.
+        for (int v = sink; v != source; v = parent[v]) {
+            int u = parent[v];
+            // На каждом шаге сравниваем path_flow с пропускной способностью
+            //  текущего ребра. В итоге path_flow станет равен 
+            //  минимальной пропускной способности на всем пути.
+            path_flow = std::min(path_flow, residual_graph[u][v]);
+        }
+
+        // 4. Обновляем остаточную сеть
+        for (int v = sink; v != source; v = parent[v]) {
+            int u = parent[v];
+            residual_graph[u][v] -= path_flow; // Уменьшаем пропускную способность прямого ребра
+            residual_graph[v][u] += path_flow; // Увеличиваем пропускную способность обратного ребра
+        }
+
+        max_flow += path_flow; // Добавляем поток этого пути к общему
+    }
+
+    std::cout << "Максимальный поток от КС " << source << " к КС " << sink << " составляет: " << max_flow << " условных единиц.\n";
+}
+
+bool Manager::bfs_for_max_flow(const std::map<int, std::map<int, double>>& residual_graph, int s, int t, std::map<int, int>& parent) {
+    std::map<int, bool> visited; // Создаем "список посещенных комнат", чтобы не ходить по кругу.
+    for(const auto& pair : stations) {
+        visited[pair.first] = false;
+    }
+
+    std::queue<int> q; // Создаем очередь "комнат к посещению".
+    q.push(s); // Кладем в нее первую комнату — наш старт `s`.
+    visited[s] = true; // Сразу отмечаем старт как посещенный.
+    // Очищаем карту путей от предыдущих итераций и указываем,
+    //  что у старта нет "родителя" (это условный знак).
+    parent.clear();
+    parent[s] = -1;
+
+    while (!q.empty()) {
+        int u = q.front();
+        q.pop();
+        // Пока очередь комнат к посещению не пуста, берем первую из очереди (`u`) и убираем ее оттуда.
+
+        // Проверяем два правила:
+        // 1.  Мы еще не были в комнате v.
+        // 2.  Труба, ведущая в v, не заполнена.
+        if (residual_graph.count(u)) {
+             for (const auto& pair : residual_graph.at(u)) { // Ищем всех соседей v для текущей комнаты u.
+                int v = pair.first;
+                double capacity = pair.second;
+                if (!visited[v] && capacity > 0) {
+                    q.push(v); // Добавляем соседа v в очередь на посещение.
+                    parent[v] = u; // Записываем в блокнот: "в v мы пришли из u".
+                    visited[v] = true; // отмечаем v как посещённую
+                }
+            }
+        }
+    }
+
+    // Если мы смогли посетить сток, значит, путь найден
+    // После того как цикл закончен (все достижимые комнаты посещены),
+    //  мы просто проверяем: "А смогли ли мы в итоге посетить сток t?".
+    //  Если да, visited[t] будет true, и функция вернет true. Иначе - false.
+    return (visited[t] == true);
+}
+
+
+void Manager::findShortestPath() {
+    std::cout << "\n--- Поиск кратчайшего пути (Алгоритм Дейкстры) ---\n";
+    if (stations.size() < 2) {
+        std::cout << "Для поиска пути необходимо как минимум 2 компрессорные станции.\n";
+        return;
+    }
+
+    int start_node = getValidInput<int>("Введите ID начальной КС: ");
+    log(std::to_string(start_node));
+    if (stations.find(start_node) == stations.end()) {
+        std::cout << "Ошибка: КС с ID " << start_node << " не найдена.\n";
+        return;
+    }
+
+    int end_node = getValidInput<int>("Введите ID конечной КС: ");
+    log(std::to_string(end_node));
+    if (stations.find(end_node) == stations.end()) {
+        std::cout << "Ошибка: КС с ID " << end_node << " не найдена.\n";
+        return;
+    }
+    
+    if (start_node == end_node) {
+        std::cout << "Ошибка: Начальная и конечная КС не могут совпадать.\n";
+        return;
+    }
+    // 1. Инициализация
+    std::map<int, double> dist; // "блокнот" для расстояний. Ключ - ID станции, значение - кратчайшее известное расстояние от start_node.
+    std::map<int, int> prev; // "Блокнот" для запоминания пути. prev[X] будет хранить ID станции, из которой мы пришли в X по кратчайшему пути.
+    for (const auto& pair : stations) {
+        dist[pair.first] = std::numeric_limits<double>::max(); // ставим расстояние "бесконечность".
+    }
+    dist[start_node] = 0; // Расстояние от старта до самого себя равно 0.
+
+    // 2. Очередь с приоритетом
+    using pii = std::pair<double, int>; //псевдоним pii для пары {расстояние, ID станции} для удобства.
+    // Создаем очередь с приоритетом. std::greater<pii> делает ее МИНИМАЛЬНОЙ очередью, 
+    // то есть pq.top() всегда будет возвращать пару с наименьшим расстоянием.
+    std::priority_queue<pii, std::vector<pii>, std::greater<pii>> pq;
+    pq.push({0.0, start_node}); // Кладем в очередь первую станцию - стартовую, с расстоянием 0.
+
+    // 3. Основной цикл алгоритма
+    while (!pq.empty()) { // пока есть станции для рассмотрения.
+        // Извлекаем из очереди станцию u с наименьшим известным расстоянием d.
+        double d = pq.top().first;
+        int u = pq.top().second;
+        pq.pop();
+
+        // Важная оптимизация. В очереди могут лежать "устаревшие"
+        //  записи для одной и той же станции. Если мы уже нашли
+        //  путь короче (dist[u]), чем тот, что мы только что извлекли 
+        // (d), то эту запись просто пропускаем.
+        if (d > dist[u]) {
+            continue;
+        }
+        if (u == end_node) break; // Оптимизация: останавливаемся, как только добрались до цели
+
+        // 4. Обход соседей
+        if (stations.count(u)) { // Для текущей станции u перебираем все ее исходящие соединения.
+            for (const auto& conn : stations.at(u).getOutgoingConnections()) {
+                int v = conn.first;
+                int pipe_id = conn.second;
+
+                if (pipes.count(pipe_id)) {
+                    const Pipe& p = pipes.at(pipe_id);
+                    // Определяем "цену" пути по этой трубе. Если она в ремонте, цена - бесконечность, иначе - ее длина.
+                    double weight = p.isInRepair() ? std::numeric_limits<double>::max() : p.getLength();
+
+                    // логика Дейкстры -> Проверяем, если текущий путь до u плюс путь от u до соседа v короче, чем ранее известный путь до v.
+                    if (dist[u] != std::numeric_limits<double>::max() && dist[u] + weight < dist[v]) {
+                        dist[v] = dist[u] + weight; // Если да - обновляем кратчайшее расстояние до v.
+                        prev[v] = u; // Запоминаем, что в v мы пришли из u.
+                        pq.push({dist[v], v}); // Добавляем (или обновляем) соседа v в очереди с новым, более коротким расстоянием.
+                    }
+                }
+            }
+        }
+    }
+
+    // 5. Восстановление и вывод пути
+    if (dist[end_node] == std::numeric_limits<double>::max()) {
+        std::cout << "Путь от КС " << start_node << " до КС " << end_node << " не найден.\n";
+    } else {
+        std::cout << "Кратчайший путь от КС " << start_node << " до КС " << end_node << " имеет длину: " << dist[end_node] << " км.\n";
+        std::cout << "Путь: ";
+        std::vector<int> path;
+        // разматываем клубок пути назад. Начиная с конечной точки end_node,
+        //  мы идем к prev[end_node], затем к prev[prev[end_node]] 
+        // и так далее, пока не дойдем до старта.
+        for (int at = end_node; at != 0; at = prev.count(at) ? prev[at] : 0) {
+            path.push_back(at);
+             if (at == start_node) break;
+        }
+        std::reverse(path.begin(), path.end());
+        
+        for (size_t i = 0; i < path.size(); ++i) {
+            std::cout << stations.at(path[i]).getName() << (i == path.size() - 1 ? "" : " -> ");
+        }
+        std::cout << std::endl;
+    }
+}
+
+
+double Manager::calculateCapacity(const Pipe& p) {
+    if (p.isInRepair() || p.getLength() <= 0) {
+        return 0.0;
+    }
+    // Формула: sqrt(d^5/l) * C
+    // Переводим диаметр из мм в м
+    double diameter_m = p.getDiameter() / 1000.0;
+    // Переводим длину из км в м
+    double length_m = p.getLength() * 1000.0;
+    // Используем поправочный коэффициент, чтобы получить разумные числа
+    double capacity = sqrt(pow(diameter_m, 5) / length_m) * 10000; 
+    return capacity;
 }
